@@ -1,5 +1,5 @@
 from ASTLIBRA_config import (
-    SUGGESTION_NUMS,
+    # SUGGESTION_NUMS,
     LEFT_SCALES_NUMS,
     RIGHT_SCALES_NUMS,
     ITEMS_EXCEL_LOCATION,
@@ -89,7 +89,7 @@ import copy
 from collections import defaultdict, Counter
 
 df = pd.read_excel(ITEMS_EXCEL_LOCATION)
-all_items = defaultdict(list)
+all_items = defaultdict(list)   # {'item_name': [(effect1, power), (effect2, power)]}
 
 last_item_name = ''
 for row in df.itertuples(index=False):
@@ -128,12 +128,24 @@ def get_score_of_effects(effects):
     
     return score
 
+
+def get_score_of_item_effects(item_effects):
+    score = 0
+    for effects in item_effects:
+        for effect in effects:
+            score += score_of_item_id[item_id_of_effect_name[effect[0]]] * score_level_of_id[item_id_of_effect_name[effect[0]]][item_id_of_power_name[effect[1]]]
+    
+    return score
+
+
 from tqdm import tqdm
 
+# cur: {'item_name': [(), ()], 'item_name': [()]}
 def dfs(start_idx, balance_nums, cur, combines):
     if len(cur) == balance_nums:
+        score = get_score_of_item_effects(cur.values())
         weight = get_weight_of_combine(cur)
-        combines[weight].append(copy.deepcopy(cur))
+        combines[weight].append((score, copy.deepcopy(cur)))
         return
 
     for i in range(start_idx, len(item_names)):
@@ -153,7 +165,6 @@ else:
     dfs(0, right_scale_nums, {}, right_combines)
 
 
-
 # check total combines
 for x in [left_combines, right_combines]:
     total_combines = 0
@@ -162,41 +173,82 @@ for x in [left_combines, right_combines]:
     print(f'weight_combines = {len(x)}, {total_combines=}')
 
 
+# import heapq
+# suggestion_sets = []
+# suggestion_nums = SUGGESTION_NUMS
+best_suggestion = ()
+best_score = 0
 
-import heapq
-suggestion_sets = []
-suggestion_nums = SUGGESTION_NUMS
 
+def get_best_set_with_sorted_combines(left, right):
+    sc, sg = 0, ''
+    for l in left:
+        for r in right:
+            score = l[0] + r[0]
+            if score <= best_score:
+                continue
+            #     return None, None
 
+            set_effects = [y for c in [l[1].values(), r[1].values()] for x in c for y in x]
+            if len(set(set_effects)) != len(set_effects):
+                continue
+
+            left_combine_item_names = [l[1].keys()]
+            right_combine_item_names = [r[1].keys()]
+            if score > sc:
+                sc = score
+                sg = (left_combine_item_names, right_combine_item_names, set_effects)
+            # return score, (left_combine_item_names, right_combine_item_names, set_effects)
+    return sc, sg
+
+# combine: {'weight': (score, {'item_name': [(effect1, power), (effect2, power)], 'item_name': [(effect3, power)]})}
 for idx, weight in tqdm(enumerate(left_combines.keys()), total=len(left_combines)):
-    # print(f'generate suggestion sets: {idx+1}/{len(left_combines.keys())}')
-    for left_combine in left_combines[weight]:
-        for right_combine in right_combines[weight]:
-            combine_effects = Counter()
-            left_combine_item_names = set(left_combine.keys())
-            right_combine_item_names = set(right_combine.keys())
-            score = 0
-            for combine in [left_combine, right_combine]:
-                for effects in combine.values():
-                    combine_effects += Counter(effects)
+    # print(f'{left_combines[weight]=}')
+    sorted_left_combine, sorted_right_combine = sorted(left_combines[weight], reverse=True, key=lambda x:x[0]), sorted(right_combines[weight], reverse=True, key=lambda x:x[0])
+    # print(f'{sorted_left_combine=}, {sorted_right_combine=}')
 
-            unique_effects = set()
-            for effect_name, nums in combine_effects.items():
-                if nums == 1:
-                    unique_effects.add(effect_name)
+    score, suggestion = get_best_set_with_sorted_combines(sorted_left_combine, sorted_right_combine)
+    if score and score > best_score:
+        best_score = score
+        best_suggestion = suggestion
 
-            score = get_score_of_effects(unique_effects)
-            if len(suggestion_sets) == SUGGESTION_NUMS:
-                heapq.heappop(suggestion_sets)
-            heapq.heappush(suggestion_sets, (score, left_combine_item_names, right_combine_item_names, unique_effects))
+    # for left_combine in sorted_left_combine:
+    #     for right_combine in sorted_right_combine:
+    #         # combine_effects = Counter()
+    #         left_combine_item_names = [left_combine[1].keys()]
+    #         right_combine_item_names = [right_combine[1].keys()]
+    #         score = left_combine[0] + right_combine[0]
+    #         if score <= best_score:
+    #             continue
+
+    #         set_effects = [y for c in [left_combine[1].values(), right_combine[1].values()] for x in c for y in x]
+    #         if len(set(set_effects)) != len(set_effects):
+    #             continue
+
+    #         best_suggestion = (left_combine_item_names, right_combine_item_names, set_effects)
+    #         best_score = score
+            # for combine in [left_combine, right_combine]:
+            #     for effects in combine.values():
+            #         combine_effects += Counter(effects)
+
+            # unique_effects = set()
+            # for effect_name, nums in combine_effects.items():
+            #     if nums == 1:
+            #         unique_effects.add(effect_name)
+
+            # score = get_score_of_effects(unique_effects)
+            # if len(suggestion_sets) == SUGGESTION_NUMS:
+            #     heapq.heappop(suggestion_sets)
+            # heapq.heappush(suggestion_sets, (score, left_combine_item_names, right_combine_item_names, unique_effects))
 
 print('======== Suggestion genrater finished ========')
-print('Suggestions:')
-suggestion_sets.sort()
-for idx, suggestion_set in enumerate(suggestion_sets):
-    print(f'suggestion {idx}:')
-    print(f'score: {suggestion_set[0]}, left_items: {suggestion_set[1]}, right_items: {suggestion_set[2]}, all_effects: {suggestion_set[3]}')
-    print('------------------------')
+print(f'score: {best_score}, left_items: {best_suggestion[0]}, right_items: {best_suggestion[1]}, all_effects: {best_suggestion[2]}')
+# print('Suggestions:')
+# suggestion_sets.sort()
+# for idx, suggestion_set in enumerate(suggestion_sets):
+#     print(f'suggestion {idx}:')
+#     print(f'score: {suggestion_set[0]}, left_items: {suggestion_set[1]}, right_items: {suggestion_set[2]}, all_effects: {suggestion_set[3]}')
+#     print('------------------------')
 
 
 

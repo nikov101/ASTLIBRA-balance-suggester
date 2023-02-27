@@ -1,6 +1,6 @@
-SUGGESTION_NUMS = 5
+# SUGGESTION_NUMS = 5
 LEFT_SCALES_NUMS = 3
-RIGHT_SCALES_NUMS = 2
+RIGHT_SCALES_NUMS = 3
 ITEMS_EXCEL_LOCATION = f'ASTLIBRA_items.xlsx'
 
 score_of_item_id = {
@@ -14,8 +14,8 @@ score_of_item_id = {
     7: 36,  # "金錢獲取"
     8: 80,  # "攻擊力"
     9: 75,  # "防禦力"
-    10: 60, # "格擋耐久"
-    11: 10, # "異常耐性"
+    10: 5, # "格擋耐久"
+    11: 20, # "異常耐性"
     12: 10, # "適應力"
     13: 8,  # "魔導力"
     14: 6,  # "最大精力"
